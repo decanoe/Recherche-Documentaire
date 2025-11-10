@@ -11,7 +11,7 @@ class Index:
         root: bool
         children: list[Index.Node | Any]
         
-        def __init__(self, min_count: int, max_count: int, leaf: bool = True, root: bool = True, keys: list[str] = [], children: list[Index.Node | Any] = []):
+        def __init__(self, min_count: int = 2, max_count: int = 4, leaf: bool = True, root: bool = True, keys: list[str] = [], children: list[Index.Node | Any] = []):
             self.leaf = leaf
             self.root = root
             self.min_count = min_count
@@ -29,10 +29,10 @@ class Index:
             return len(self.children)
         
         def Split(self) -> tuple[str, Index.Node]:
-            node: Index.Node = Index.Node(self.min_count, self.max_count, self.leaf, False, self.keys[self.min_count + 1:], self.children[self.min_count + 1:])
-            key: str = self.keys[self.min_count]
-            self.keys = self.keys[:self.min_count]
-            self.children = self.children[:self.min_count + 1]
+            node: Index.Node = Index.Node(self.min_count, self.max_count, self.leaf, False, self.keys[self.min_count:], self.children[self.min_count:])
+            key: str = self.keys[self.min_count - 1]
+            self.keys = self.keys[:self.min_count - 1]
+            self.children = self.children[:self.min_count]
             
             return (key, node)
             
@@ -88,32 +88,25 @@ class Index:
                 return self._Add(key, value)
         
         def __str__(self, prefix = "") -> str:
-            out: str = prefix + "(\n"
+            out: str = prefix + "("
             if (self.Size() != 0):
                 for i in range(self.Size() - 1):
                     if (self.IsLeaf()):
-                        out += prefix + "    " + str(self.children[i])
+                        out += str(self.children[i]) + " [" + self.keys[i] + "] "
                     else:
-                        out += self.children[i].__str__(prefix + "    ")
-                    out += "\n" + prefix + "    " + self.keys[i] + "\n"
+                        out += "\n" + self.children[i].__str__(prefix + "    ") + "\n" + prefix + "    [" + self.keys[i] + "]"
                 if (self.IsLeaf()):
-                    out += prefix + "    " + str(self.children[self.Size() - 1])
+                    out += str(self.children[self.Size() - 1])
                 else:
-                    out += self.children[i].__str__(prefix + "    ")
-            return out + "\n" + prefix + ")"
+                    out += "\n" + self.children[self.Size() - 1].__str__(prefix + "    ")
+            
+            if (self.IsLeaf()):
+                return out + ")"
+            else:
+                return out + "\n" + prefix + ")"
 
     def __init__():
         pass
     
-    def Add(word: str, document: Any):
+    def Add(word: str, document_id: str):
         pass
-
-# from random import shuffle
-
-# tree: Index.Node = Index.Node(2, 4)
-
-# l = list("abcdefghijklmnopqrstuvwxyz")
-# shuffle(l)
-# for c in l:
-#     tree.Add(c, c)
-# print(tree)
