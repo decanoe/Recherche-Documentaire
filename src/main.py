@@ -1,5 +1,9 @@
-from LoadDocument import LoadDocument
+from Document import Document
+from Stemer import Stemer
+from Index import Index
 
-loadDocument = LoadDocument()
-loadDocument.loadDocuments("ressources/AP891216.txt")
-print(loadDocument.listDocuments)
+listDocuments = Document.loadDocuments("ressources/documents")
+stemer = Stemer("ressources/stem.txt")
+index = Index()
+for document in listDocuments:
+    document.indexing(stemer, index)

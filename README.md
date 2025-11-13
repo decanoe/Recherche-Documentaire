@@ -3,7 +3,7 @@
 # todo:
 - index structure
 - document loader
-- stemmer
+- stemmer (keep the numbers and letters)
 - basic request
 - weight in index
 - stoplist
