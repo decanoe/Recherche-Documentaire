@@ -185,11 +185,11 @@ class Index:
     def Add(self, word: str, document_id: str):
         self.tree.GetOrSetDefault(word, Index.WeightList(word)).Add(document_id)
         self.document_lengths[document_id] = -1
-    def RecomputeWeights(self, document_count: int):
+    def RecomputeWeights(self):
         for key in self.document_lengths.keys():
             self.document_lengths[key] = 0
         
-        self.tree.RecomputeWeights(document_count, self.document_lengths)
+        self.tree.RecomputeWeights(len(self.document_lengths), self.document_lengths)
         
         for key, length in self.document_lengths.items():
             self.document_lengths[key] = math.sqrt(length)

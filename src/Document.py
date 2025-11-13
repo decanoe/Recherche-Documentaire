@@ -4,7 +4,6 @@ from Index import Index
 import os
 import re
 
-
 class Document:
 
     def __init__(self, dictInfoDocument: dict[str, str]):
