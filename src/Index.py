@@ -3,6 +3,7 @@ from typing import Any
 import math
 import pickle
 import os
+import time
 
 from Stemer import Stemer
 
@@ -41,25 +42,66 @@ class Index:
             self.elements = []
         
         def Get(self, document_id: str) -> Index.WeightList.Weight:
-            for w in self.elements:
-                if (document_id < w.document_id):
-                    return None
-                if (document_id == w.document_id):
-                    return w
+            a: int = 0
+            b: int = len(self.elements) - 1
+            if (b < 0 or document_id < self.elements[a].document_id):
+                return None
+            if (document_id > self.elements[b].document_id):
+                return None
+            while a <= b:
+                c = (a + b) // 2
+                if (document_id == self.elements[c].document_id):
+                    return self.elements[c]
+                if (document_id < self.elements[c].document_id):
+                    b = c - 1
+                else:
+                    a = c + 1
+            return None
+                
+            # for w in self.elements:
+            #     if (document_id < w.document_id):
+            #         return None
+            #     if (document_id == w.document_id):
+            #         return w
         def GetOrSet(self, document_id: str) -> Index.WeightList.Weight:
-            i: int = 0
-            for w in self.elements:
-                if (document_id < w.document_id):
-                    e = Index.WeightList.Weight(document_id, 0)
-                    self.elements.insert(i, e)
-                    return e
-                if (document_id == w.document_id):
-                    return w
-                i += 1
+            a: int = 0
+            b: int = len(self.elements) - 1
+            if (b < 0 or document_id < self.elements[a].document_id):
+                e = Index.WeightList.Weight(document_id, 0)
+                self.elements.insert(0, e)
+                return e
+            if (document_id > self.elements[b].document_id):
+                e = Index.WeightList.Weight(document_id, 0)
+                self.elements.append(e)
+                return e
             
+            while a <= b:
+                c = (a + b) // 2
+                if (document_id == self.elements[c].document_id):
+                    return self.elements[c]
+                if (document_id < self.elements[c].document_id):
+                    b = c - 1
+                else:
+                    a = c + 1
+            while document_id > self.elements[b].document_id:
+                b += 1
             e = Index.WeightList.Weight(document_id, 0)
-            self.elements.append(e)
+            self.elements.insert(b, e)
             return e
+        
+            # i: int = 0
+            # for w in self.elements:
+            #     if (document_id < w.document_id):
+            #         e = Index.WeightList.Weight(document_id, 0)
+            #         self.elements.insert(i, e)
+            #         return e
+            #     if (document_id == w.document_id):
+            #         return w
+            #     i += 1
+            
+            # e = Index.WeightList.Weight(document_id, 0)
+            # self.elements.append(e)
+            # return e
         def Add(self, document_id: str, nb_occurrence: int = 1):
             self.GetOrSet(document_id).Add(nb_occurrence)
     
@@ -80,7 +122,7 @@ class Index:
         keys: list[str]
         leaf: bool
         root: bool
-        children: list[Index.Tree | Index.WeightList]
+        children: list[Index.Tree | Index.WeightList | str]
         
         def __init__(self, min_count: int = 2, max_count: int = 4, leaf: bool = True, root: bool = True, keys: list[str] = [], children: list[Index.Tree | Any] = []):
             self.leaf = leaf
@@ -108,26 +150,44 @@ class Index:
             else:
                 self.keys = self.keys[:self.min_count - 1]
             return (key, node)
-            
-        def _Add(self, key: str, value: Index.WeightList):
+        
+        def greater(self, key: str, to_key: str):
+            if (key[-1] == "*"):
+                return key[:-1] > to_key
+            return key > to_key
+        def lower_equal(self, key: str, to_key: str):
+            if (key[-1] == "*"):
+                return key[:-1] <= to_key
+            return key <= to_key
+        def equal(self, key: str, to_key: str):
+            if (key[-1] == "*" and to_key.startswith(key[:-1])):
+                return True
+            return key == to_key
+        def _Add(self, key: str, value: Index.WeightList) -> Index.WeightList:
             i: int = 0
-            while i < len(self.keys) and key > self.keys[i]:
+            while i < len(self.keys) and self.greater(key, self.keys[i]):
                 i += 1
             
             if (self.leaf):
+                if (i == len(self.keys)):
+                    self.keys.append(key)
+                    self.children.append(value)
+                    return value
+                if (self.equal(key, self.keys[i])):
+                    return self.children[i]
                 self.keys.insert(i, key)
                 self.children.insert(i, value)
-                return
+                return value
             else:
                 if (self.children[i].IsFull()):
                     middle_key, right_node = self.children[i].Split()
                     self.children.insert(i + 1, right_node)
                     self.keys.insert(i, middle_key)
-                    if (key > self.keys[i]):
+                    if (self.greater(key, self.keys[i])):
                         i += 1
                 return self.children[i]._Add(key, value)
-        def _RootAdd(self, key: str, value: Index.WeightList):
-            self._Add(key, value)
+        def _RootAdd(self, key: str, value: Index.WeightList) -> Index.WeightList:
+            result = self._Add(key, value)
             
             if (self.IsFull()):
                 middle_key, right_node = self.Split()
@@ -136,33 +196,32 @@ class Index:
                 self.children = [left_node, right_node]
                 self.keys = [middle_key]
                 self.leaf = False
-        def Add(self, key: str, value: Index.WeightList):
+            return result
+        def Add(self, key: str, value: Index.WeightList) -> Index.WeightList:
             if (self.root):
                 return self._RootAdd(key, value)
             else:
                 return self._Add(key, value)
         
-        def Get(self, key: str, default: Index.WeightList = None) -> Index.WeightList:
+        def Get(self, key: str, default: Index.WeightList = None) -> Index.WeightList | str:
             i: int = 0
-            while i < len(self.keys) and key > self.keys[i]:
+            while i < len(self.keys) and self.greater(key, self.keys[i]):
                 i += 1
             
             if (self.IsLeaf()):
                 if (i == len(self.keys)):
                     return default
-                if (self.keys[i] == key):
+                if (self.equal(key, self.keys[i])):
                     return self.children[i]
                 return default
             return self.children[i].Get(key)
-        def GetOrSetDefault(self, key: str, default: Index.WeightList = None) -> Index.WeightList:
-            result = self.Get(key)
-            if (result == None):
-                self.Add(key, default)
-                return default
-            return result
+        def GetOrSetDefault(self, key: str, default: Index.WeightList = None) -> Index.WeightList | str:
+            return self.Add(key, default)
         
         def RecomputeWeights(self, document_count: int, document_lengths: dict[str, float]):
             for child in self.children:
+                if (isinstance(child, str)):
+                    continue
                 child.RecomputeWeights(document_count, document_lengths)
         
         def __str__(self, prefix = "") -> str:
@@ -196,18 +255,29 @@ class Index:
         
         i = 0
         for document in listDocuments:
-            print(f"\033[2Kindexing document {i}/{len(listDocuments)}", end="\r")
-            i += 1
             document.indexing(stemer, index)
+            i += 1
+            print(f"\033[2Kindexing document {i}/{len(listDocuments)} [" + "█" * (round(i / len(listDocuments) * 10)) + " " * (10 - round(i / len(listDocuments) * 10)) + "]", end="\r")
         index.RecomputeWeights()
-        print("indexing completed")
+        print("\033[2Kindexing completed")
         return index
     def SaveToFile(self, index_path: str) -> Index:
         pickle.dump(self, open(index_path, "wb"))
+    
     def Add(self, word: str, document_id: str):
+        word += "$"
         self.tree.GetOrSetDefault(word, Index.WeightList(word)).Add(document_id)
-        self.document_lengths[document_id] = -1
         
+        for i in range(len(word)):
+            rotated_word = self.Rotate(word, i)
+            self.tree.GetOrSetDefault(rotated_word, word)
+        self.document_lengths[document_id] = -1
+    def Get(self, word: str) -> Index.WeightList:
+        output: str | Index.WeightList = self.tree.Get(word)
+        if (isinstance(output,str)):
+            return self.tree.Get(output)
+        return output
+    
     def RecomputeWeights(self):
         for key in self.document_lengths.keys():
             self.document_lengths[key] = 0
@@ -217,10 +287,32 @@ class Index:
         for key, length in self.document_lengths.items():
             self.document_lengths[key] = math.sqrt(length)
     
+    def Rotate(self, word: str, amount: int = 1) -> str:
+        return word[amount:] + word[:amount]
+    def PrepareWordForQuery(self, word: str) -> str:
+        count: int = word.count("*")
+        
+        if (count == 0):
+            return word + "$"
+        if (count > 2):
+            raise Exception("Cannot use more than two wildcards in the same word")
+        
+        if (count == 2 and word[0] == "*" and word[-1] == "*"):
+            return word[1:]
+        if (count == 2):
+            raise Exception("Cannot use two wildcards in the same word unless it is at the start and end")
+        if (word[0] == "*"):
+            return word[1:] + "$*"
+        if (word[-1] == "*"):
+            return "$" + word[:-1] + "*"
+        
+        return word.split("*")[-1] + "$" + word.split("*")[0] + "*"
+        
     def Query(self, words: list[str]) -> list[tuple[str, float]]:
         word_occ: dict[str, int] = {}
         for w in words:
-            word_occ[w] = word_occ.get(w, 0) + 1
+            new_w: str = self.PrepareWordForQuery(w)
+            word_occ[new_w] = word_occ.get(new_w, 0) + 1
         
         # ================ QUERY VECTOR CONSTRUCTION ========================
         query_vector: dict[str, float] = {}
@@ -237,7 +329,7 @@ class Index:
         scores: dict[str, float] = {}
         
         for word, value in query_vector.items():
-            weight_list: Index.WeightList = self.tree.Get(word)
+            weight_list: Index.WeightList = self.Get(word)
             if (weight_list != None):
                 for weight in weight_list.elements:
                     v: float = weight.weight * value
