@@ -3,12 +3,16 @@ from Stemer import Stemer
 from Index import Index
 from Query import Query
 
-listDocuments = Document.loadDocuments("ressources/documents")
-stemer = Stemer("ressources/stem.txt")
-index = Index()
-for document in listDocuments[:10]:
-    document.indexing(stemer, index)
-index.RecomputeWeights()
+index_path: str = "ressources/index.bin"
+documents_dir: str = "ressources/documents"
+stemer_path: str = "ressources/stem.txt"
+
+stemer: Stemer = Stemer(stemer_path)
+
+index: Index = Index.LoadFromFile(index_path)
+if (index == None):
+    index = Index.FromDocuments(Document.loadDocuments(documents_dir), stemer)
+    index.SaveToFile(index_path)
 
 query = Query("New York!")
 print(query.getStemerWords(stemer))

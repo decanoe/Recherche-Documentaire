@@ -1,6 +1,10 @@
 from __future__ import annotations
 from typing import Any
 import math
+import pickle
+import os
+
+from Stemer import Stemer
 
 class Index:
     class WeightList:
@@ -182,9 +186,28 @@ class Index:
     def __init__(self):
         self.tree = Index.Tree()
         self.document_lengths = {}
+    def LoadFromFile(index_path: str) -> Index:
+        if os.path.exists(index_path):
+            return pickle.load(open(index_path, "rb"))
+        else:
+            return None
+    def FromDocuments(listDocuments: list, stemer: Stemer) -> Index:
+        index: Index = Index()
+        
+        i = 0
+        for document in listDocuments:
+            print(f"\033[2Kindexing document {i}/{len(listDocuments)}", end="\r")
+            i += 1
+            document.indexing(stemer, index)
+        index.RecomputeWeights()
+        print("indexing completed")
+        return index
+    def SaveToFile(self, index_path: str) -> Index:
+        pickle.dump(self, open(index_path, "wb"))
     def Add(self, word: str, document_id: str):
         self.tree.GetOrSetDefault(word, Index.WeightList(word)).Add(document_id)
         self.document_lengths[document_id] = -1
+        
     def RecomputeWeights(self):
         for key in self.document_lengths.keys():
             self.document_lengths[key] = 0
@@ -227,3 +250,4 @@ class Index:
         result = [(key, score) for key, score in scores.items()]
         result.sort(key=lambda s: s[1], reverse=True)
         return result
+    
