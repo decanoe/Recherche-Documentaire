@@ -2,7 +2,6 @@ from Stemer import Stemer
 from Soundex import Soundex
 import re
 
-
 class Query:
     queryWords: list[str]
 
@@ -27,14 +26,30 @@ class Query:
                     soundex.soundexerize(word)
                 )
                 listCost: list[str] = []
+                trigrams: list[str] = self.getTrigrams(word)
                 for soundexWord in listSoundexWord:
-                    cost: int = 0
-                    for i in range(1, len(soundexWord) - 1):
-                        for j in range(1, len(word) - 1):
-                            if soundexWord[i - 1 : i + 1] == word[j - 1 : j + 1]:
-                                cost += 1
-                    listCost.append(cost)
+                    sondex_trigrams: list[str] = self.getTrigrams(soundexWord)
+                    listCost.append(self.countIntersectionCardinal(trigrams, sondex_trigrams) / self.countUnionCardinal(trigrams, sondex_trigrams))
                 wordList.append(
                     stemer.stemerize(listSoundexWord[listCost.index(max(listCost))])
                 )
         return wordList
+
+    def getTrigrams(self, word: str) -> list[str]:
+        output: list[str] = []
+        for i in range(1, len(word) - 1):
+            if word[i - 1 : i + 1] not in output:
+                output.append(word[i - 1 : i + 1])
+        return output
+    def countIntersectionCardinal(self, trigrams1: list[str], trigrams2: list[str]) -> list[str]:
+        count: int = 0
+        for t in trigrams2:
+            if t in trigrams1:
+                count += 1
+        return count
+    def countUnionCardinal(self, trigrams1: list[str], trigrams2: list[str]) -> list[str]:
+        count: int = 0
+        for t in trigrams2:
+            if t not in trigrams1:
+                count += 1
+        return count + len(trigrams1)

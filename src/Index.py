@@ -9,110 +9,68 @@ from Stemer import Stemer
 class Index:
     class WeightList:
         class Weight:
-            document_id: str
             nb_occurrence: int
             weight: float
             
-            def __init__(self, document_id: str, nb_occurrence: int = 0):
-                self.document_id = document_id
+            def __init__(self, nb_occurrence: int = 0):
                 self.nb_occurrence = nb_occurrence
                 self.weight = 1
                 
             def Add(self, nb_occurrence: int = 1):
                 self.nb_occurrence += nb_occurrence
                 
-            def RecomputeWeights(self, idf: float, document_lengths: dict[str, float]):
+            def RecomputeWeights(self, idf: float):
                 if (self.nb_occurrence == 0):
                     self.weight = 0
                     return
-
                 self.weight = (1 + math.log10(self.nb_occurrence)) * idf
-                document_lengths[self.document_id] += self.weight * self.weight
             
             def __str__(self) -> str:
                 return f"({self.document_id}: {self.nb_occurrence}/{self.weight})"
             
-        word: str
-        elements: list[Index.WeightList.Weight]
-        idf: float
+        _word: str
+        _elements: dict[str, Index.WeightList.Weight]
+        _idf: float
         
         def __init__(self, word: str):
-            self.word = word
-            self.elements = []
+            self._word = word
+            self._elements = {}
         
-        def Get(self, document_id: str) -> Index.WeightList.Weight:
-            a: int = 0
-            b: int = len(self.elements) - 1
-            if (b < 0 or document_id < self.elements[a].document_id):
-                return None
-            if (document_id > self.elements[b].document_id):
-                return None
-            while a <= b:
-                c = (a + b) // 2
-                if (document_id == self.elements[c].document_id):
-                    return self.elements[c]
-                if (document_id < self.elements[c].document_id):
-                    b = c - 1
-                else:
-                    a = c + 1
-            return None
-                
-            # for w in self.elements:
-            #     if (document_id < w.document_id):
-            #         return None
-            #     if (document_id == w.document_id):
-            #         return w
-        def GetOrSet(self, document_id: str) -> Index.WeightList.Weight:
-            a: int = 0
-            b: int = len(self.elements) - 1
-            if (b < 0 or document_id < self.elements[a].document_id):
-                e = Index.WeightList.Weight(document_id, 0)
-                self.elements.insert(0, e)
-                return e
-            if (document_id > self.elements[b].document_id):
-                e = Index.WeightList.Weight(document_id, 0)
-                self.elements.append(e)
-                return e
-            
-            while a <= b:
-                c = (a + b) // 2
-                if (document_id == self.elements[c].document_id):
-                    return self.elements[c]
-                if (document_id < self.elements[c].document_id):
-                    b = c - 1
-                else:
-                    a = c + 1
-            while document_id > self.elements[b].document_id:
-                b += 1
-            e = Index.WeightList.Weight(document_id, 0)
-            self.elements.insert(b, e)
-            return e
-        
-            # i: int = 0
-            # for w in self.elements:
-            #     if (document_id < w.document_id):
-            #         e = Index.WeightList.Weight(document_id, 0)
-            #         self.elements.insert(i, e)
-            #         return e
-            #     if (document_id == w.document_id):
-            #         return w
-            #     i += 1
-            
-            # e = Index.WeightList.Weight(document_id, 0)
-            # self.elements.append(e)
-            # return e
+        def _Get(self, document_id: str) -> Index.WeightList.Weight:
+            return self._elements.get(document_id, Index.WeightList.Weight())
+        def _GetOrSet(self, document_id: str) -> Index.WeightList.Weight:
+            if (document_id not in self._elements):
+                self._elements[document_id] = Index.WeightList.Weight()
+            return self._elements[document_id]
         def Add(self, document_id: str, nb_occurrence: int = 1):
-            self.GetOrSet(document_id).Add(nb_occurrence)
+            self._GetOrSet(document_id).Add(nb_occurrence)
     
         def RecomputeWeights(self, document_count: int, document_lengths: dict[str, float]):
-            self.idf = math.log10(document_count / len(self.elements))
-            for w in self.elements:
-                w.RecomputeWeights(self.idf, document_lengths)
+            self._idf = math.log10(document_count / len(self._elements))
+            for d, w in self._elements.items():
+                w.RecomputeWeights(self._idf)
+                document_lengths[d] += w.weight * w.weight
+        
+        def GetIDF(self) -> float:
+            return self._idf
+        def GetDocumentWeights(self) -> list[tuple[str, float]]:
+            return [(d, e.weight) for d, e in self._elements.items()]
         
         def __str__(self, full: bool = True) -> str:
             if (full):
-                return f"{self.word}: (" + ", ".join([str(e) for e in self.elements]) + ")"
-            return f"(WeightList for \"{self.word}\")"
+                return f"{self._word}: (" + ", ".join([str(e) for e in self._elements]) + ")"
+            return f"(WeightList for \"{self._word}\")"
+    class NullWeightList:
+        def GetDocumentWeights(self) -> list[tuple[str, float]]:
+            return []
+        def GetIDF(self) -> float:
+            return 0
+        def RecomputeWeights(self):
+            pass
+        def Add(self, document_id: str, nb_occurrence: int = 1):
+            pass
+        def __str__(self, full: bool = True) -> str:
+            return f"(NullWeightList)"
 
     class Tree:
         min_count: int
@@ -222,7 +180,14 @@ class Index:
                 if (isinstance(child, str)):
                     continue
                 child.RecomputeWeights(document_count, document_lengths)
-        
+        def RemoveNullWeights(self):
+            for i in range(len(self.children)):
+                if (isinstance(self.children[i], Index.Tree)):
+                    self.children[i].RemoveNullWeights()
+                elif (isinstance(self.children[i], Index.WeightList)):
+                    if (self.children[i].GetIDF() == 0):
+                        self.children[i] = Index.NullWeightList()
+            
         def __str__(self, prefix = "") -> str:
             out: str = prefix + "("
             if (self.Size() != 0):
@@ -246,7 +211,10 @@ class Index:
         self.document_lengths = {}
     def LoadFromFile(index_path: str) -> Index:
         if os.path.exists(index_path):
-            return pickle.load(open(index_path, "rb"))
+            print("\033[2KLoading index", end="\r")
+            index = pickle.load(open(index_path, "rb"))
+            print("\033[2K", end="\r")
+            return index
         else:
             return None
     def FromDocuments(listDocuments: list, stemer: Stemer) -> Index:
@@ -258,6 +226,7 @@ class Index:
             i += 1
             print(f"\033[2Kindexing document {i}/{len(listDocuments)} [" + "█" * (round(i / len(listDocuments) * 10)) + " " * (10 - round(i / len(listDocuments) * 10)) + "]", end="\r")
         index.RecomputeWeights()
+        index.RemoveNullWeights()
         print("\033[2Kindexing completed")
         return index
     def SaveToFile(self, index_path: str) -> Index:
@@ -285,6 +254,8 @@ class Index:
         
         for key, length in self.document_lengths.items():
             self.document_lengths[key] = math.sqrt(length)
+    def RemoveNullWeights(self):
+        self.tree.RemoveNullWeights()
     
     def Rotate(self, word: str, amount: int = 1) -> str:
         return word[amount:] + word[:amount]
@@ -330,9 +301,9 @@ class Index:
         for word, value in query_vector.items():
             weight_list: Index.WeightList = self.Get(word)
             if (weight_list != None):
-                for weight in weight_list.elements:
-                    v: float = weight.weight * value
-                    scores[weight.document_id] = scores.get(weight.document_id, 0) + v
+                for document_id, weight in weight_list.GetDocumentWeights():
+                    v: float = weight * value
+                    scores[document_id] = scores.get(document_id, 0) + v
         
         for key in scores.keys():
             if (self.document_lengths[key] != 0):
