@@ -4,7 +4,7 @@
 V index structure
 V document loader
 V stemmer (keep the numbers and letters)
-- basic request
+V basic request
 V weight in index
 - stoplist ?
 - interface

@@ -17,7 +17,7 @@ if index == None:
 
 soundex = Soundex(stemer)
 
-query = Query("New York!")
+query = Query("New York*!")
 print(query.getCorrectedWords(stemer, soundex))
 for d, s in index.Query(query.getCorrectedWords(stemer, soundex)):
     print(f"{d} \twith a score of {s}")

@@ -18,7 +18,9 @@ class Query:
     def getCorrectedWords(self, stemer: Stemer, soundex: Soundex):
         wordList: list[str] = []
         for word in self.queryWords:
-            if stemer.isStemerizable(word):
+            if "*" in word:
+                wordList.append(word)
+            elif stemer.isStemerizable(word):
                 wordList.append(stemer.stemerize(word))
             else:
                 listSoundexWord: list[str] = soundex.dictSoundex.get(
@@ -32,5 +34,7 @@ class Query:
                             if soundexWord[i - 1 : i + 1] == word[j - 1 : j + 1]:
                                 cost += 1
                     listCost.append(cost)
-                wordList.append(listSoundexWord[listCost.index(max(listCost))])
+                wordList.append(
+                    stemer.stemerize(listSoundexWord[listCost.index(max(listCost))])
+                )
         return wordList
