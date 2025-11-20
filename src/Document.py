@@ -4,6 +4,7 @@ from Index import Index
 import os
 import re
 
+
 class Document:
 
     def __init__(self, dictInfoDocument: dict[str, str]):
@@ -53,10 +54,10 @@ class Document:
         return listDocuments
 
     def indexing(self, stemer: Stemer, index: Index):
-        for key in self.dictInfoDocument.keys():
-            if key != "DOCNO" or key != "FILEID":
-                text: str = self.dictInfoDocument.get(key).lower()
-                text = re.sub(r"[^a-z0-9\s]", " ", text)
-                listWord = text.split()
-                for word in listWord:
-                    index.Add(stemer.stemerize(word), self.id)
+        text: str = self.dictInfoDocument.get("TEXT").lower()
+        text = re.sub(r"[^a-z0-9\s]", " ", text)
+        listWord = text.split()
+        i: int = 0
+        for word in listWord:
+            i += 1
+            index.Add(stemer.stemerize(word), self.id, i)
