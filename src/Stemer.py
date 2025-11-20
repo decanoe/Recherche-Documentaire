@@ -12,7 +12,7 @@ class Stemer:
             lines = f.readlines()[1:]
             for line in lines:
                 listWord: list[str] = line.split("|")
-                root: str = listWord[0]
+                root: str = listWord[0].strip()
                 listWord = [word.strip() for word in listWord[1].split()]
                 for word in listWord:
                     self.dictStem[word] = root
