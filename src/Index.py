@@ -10,24 +10,24 @@ from Stemer import Stemer
 class Index:
     class WeightList:
         class Weight:
-            positions_word: list[int]
+            positions_count: int
             weight: float
 
             def __init__(self):
-                self.positions_word = []
+                self.positions_count = 0
                 self.weight = 1
 
             def Add(self, position: int):
-                self.positions_word.append(position)
+                self.positions_count += 1
 
             def RecomputeWeights(self, idf: float):
-                if len(self.positions_word) == 0:
+                if self.positions_count == 0:
                     self.weight = 0
                     return
-                self.weight = (1 + math.log10(len(self.positions_word))) * idf
+                self.weight = (1 + math.log10(self.positions_count)) * idf
 
             def __str__(self) -> str:
-                return f"({len(self.positions_word)}/{round(self.weight,3)} {self.positions_word})"
+                return f"({self.positions_count}/{round(self.weight,3)})"
 
         _word: str
         _elements: dict[str, Index.WeightList.Weight]
@@ -39,18 +39,14 @@ class Index:
 
         def _Get(self, document_id: str) -> Index.WeightList.Weight:
             return self._elements.get(document_id, Index.WeightList.Weight())
-
         def _GetOrSet(self, document_id: str) -> Index.WeightList.Weight:
             if document_id not in self._elements:
                 self._elements[document_id] = Index.WeightList.Weight()
             return self._elements[document_id]
-
         def Add(self, document_id: str, position: int):
             self._GetOrSet(document_id).Add(position)
 
-        def RecomputeWeights(
-            self, document_count: int, document_lengths: dict[str, float]
-        ):
+        def RecomputeWeights(self, document_count: int, document_lengths: dict[str, float]):
             self._idf = math.log10(document_count / len(self._elements))
             for d, w in self._elements.items():
                 w.RecomputeWeights(self._idf)
@@ -58,9 +54,10 @@ class Index:
 
         def GetIDF(self) -> float:
             return self._idf
-
         def GetDocumentWeights(self) -> list[tuple[str, float]]:
             return [(d, e.weight) for d, e in self._elements.items()]
+        def IsEmpty(self) -> bool:
+            return len(self._elements) == 0
 
         def __str__(self, full: bool = True) -> str:
             if full:
@@ -70,23 +67,7 @@ class Index:
                     + ")"
                 )
             return f'(WeightList for "{self._word}")'
-
-    class NullWeightList:
-        def GetDocumentWeights(self) -> list[tuple[str, float]]:
-            return []
-
-        def GetIDF(self) -> float:
-            return 0
-
-        def RecomputeWeights(self):
-            pass
-
-        def Add(self, document_id: str, nb_occurrence: int = 1):
-            pass
-
-        def __str__(self, full: bool = True) -> str:
-            return f"(NullWeightList)"
-
+    
     class Tree:
         min_count: int
         max_count: int
@@ -96,15 +77,7 @@ class Index:
         root: bool
         children: list[Index.Tree | Index.WeightList | str]
 
-        def __init__(
-            self,
-            min_count: int = 2,
-            max_count: int = 4,
-            leaf: bool = True,
-            root: bool = True,
-            keys: list[str] = [],
-            children: list[Index.Tree | Any] = [],
-        ):
+        def __init__(self, min_count: int = 2, max_count: int = 4, leaf: bool = True, root: bool = True, keys: list[str] = [], children: list[Index.Tree | Any] = []):
             self.leaf = leaf
             self.root = root
             self.min_count = min_count
@@ -114,25 +87,15 @@ class Index:
 
         def IsLeaf(self) -> bool:
             return self.leaf
-
         def IsRoot(self) -> bool:
             return self.root
-
         def IsFull(self) -> bool:
             return len(self.children) == self.max_count
-
         def Size(self) -> bool:
             return len(self.children)
 
         def Split(self) -> tuple[str, Index.Tree]:
-            node: Index.Tree = Index.Tree(
-                self.min_count,
-                self.max_count,
-                self.leaf,
-                False,
-                self.keys[self.min_count :],
-                self.children[self.min_count :],
-            )
+            node: Index.Tree = Index.Tree(self.min_count, self.max_count, self.leaf, False, self.keys[self.min_count:], self.children[self.min_count:])
             key: str = self.keys[self.min_count - 1]
             self.children = self.children[: self.min_count]
             if self.IsLeaf():
@@ -145,12 +108,10 @@ class Index:
             if key[-1] == "*":
                 return key[:-1] > to_key
             return key > to_key
-
         def lower_equal(self, key: str, to_key: str):
             if key[-1] == "*":
                 return key[:-1] <= to_key
             return key <= to_key
-
         def equal(self, key: str, to_key: str):
             if key[-1] == "*" and to_key.startswith(key[:-1]):
                 return True
@@ -179,68 +140,78 @@ class Index:
                     if self.greater(key, self.keys[i]):
                         i += 1
                 return self.children[i]._Add(key, value)
-
         def _RootAdd(self, key: str, value: Index.WeightList) -> Index.WeightList:
             result = self._Add(key, value)
 
             if self.IsFull():
                 middle_key, right_node = self.Split()
-                left_node = Index.Tree(
-                    self.min_count,
-                    self.max_count,
-                    self.leaf,
-                    False,
-                    self.keys,
-                    self.children,
-                )
+                left_node = Index.Tree(self.min_count, self.max_count, self.leaf, False, self.keys, self.children)
 
                 self.children = [left_node, right_node]
                 self.keys = [middle_key]
                 self.leaf = False
             return result
-
         def Add(self, key: str, value: Index.WeightList) -> Index.WeightList:
             if self.root:
                 return self._RootAdd(key, value)
             else:
                 return self._Add(key, value)
 
-        def Get(
-            self, key: str, default: Index.WeightList = None
-        ) -> Index.WeightList | str:
+        def _GetSingle(self, key: str) -> Index.WeightList | str:
             i: int = 0
             while i < len(self.keys) and self.greater(key, self.keys[i]):
                 i += 1
 
             if self.IsLeaf():
                 if i == len(self.keys):
-                    return default
+                    return None
                 if self.equal(key, self.keys[i]):
                     return self.children[i]
-                return default
-            return self.children[i].Get(key)
+                return None
+            return self.children[i]._GetSingle(key)
+        def _GetMultiple(self, key: str) -> list[Index.WeightList | str]:
+            i: int = 0
+            while i < len(self.keys) and self.greater(key, self.keys[i]):
+                i += 1
 
-        def GetOrSetDefault(
-            self, key: str, default: Index.WeightList = None
-        ) -> Index.WeightList | str:
-            return self.Add(key, default)
-
-        def RecomputeWeights(
-            self, document_count: int, document_lengths: dict[str, float]
-        ):
+            result = []
+            if self.IsLeaf():
+                while i < len(self.keys) and self.equal(key, self.keys[i]):
+                    result.append(self.children[i])
+                    i += 1
+                return result
+            else:
+                while i < len(self.keys) and self.equal(key, self.keys[i]):
+                    result += self.children[i]._GetMultiple(key)
+                    i += 1
+                result += self.children[i]._GetMultiple(key)
+                return result
+        def Get(self, key: str) -> list[Index.WeightList]:
+            if (not self.IsRoot()):
+                raise Exception("Get must be called on the root of the tree")
+            
+            if key[-1] == "*":
+                result = []
+                potential_results = self._GetMultiple(key)
+                while len(potential_results) != 0:
+                    temp = potential_results.pop()
+                    if isinstance(temp, str):
+                        temp = self._GetSingle(temp)
+                    if (temp not in result):
+                        result.append(temp)
+                return result
+            else:
+                result = self._GetSingle(key)
+                if isinstance(result, str):
+                    result = self._GetSingle(result)
+                return [] if result == None else [result]
+        
+        def RecomputeWeights(self, document_count: int, document_lengths: dict[str, float]):
             for child in self.children:
                 if isinstance(child, str):
                     continue
                 child.RecomputeWeights(document_count, document_lengths)
-
-        def RemoveNullWeights(self):
-            for i in range(len(self.children)):
-                if isinstance(self.children[i], Index.Tree):
-                    self.children[i].RemoveNullWeights()
-                elif isinstance(self.children[i], Index.WeightList):
-                    if self.children[i].GetIDF() == 0:
-                        self.children[i] = Index.NullWeightList()
-
+        
         def __str__(self, prefix="") -> str:
             out: str = prefix + "("
             if self.Size() != 0:
@@ -285,7 +256,6 @@ class Index:
             return index
         else:
             return None
-
     def FromDocuments(listDocuments: list, stemer: Stemer) -> Index:
         index: Index = Index()
 
@@ -301,29 +271,35 @@ class Index:
                 end="\r",
             )
         index.RecomputeWeights()
-        index.RemoveNullWeights()
         print("\033[2Kindexing completed")
         return index
-
     def SaveToFile(self, index_path: str) -> Index:
         pickle.dump(self, open(index_path, "wb"))
+    def CreateStopWordList(self, index_path: str, threshold: float):
+        with open(index_path, "w") as file:
+            nodes: list[Index.Tree | str | Index.WeightList] = [self.tree]
+            
+            while len(nodes) != 0:
+                node = nodes.pop()
+                
+                if (isinstance(node, Index.Tree)):
+                    for child in node.children:
+                        nodes.append(child)
+                if (isinstance(node, Index.WeightList)):
+                    if (node.GetIDF() < threshold):
+                        file.write(node._word.removesuffix("$") + "\n")
 
     def Add(self, word: str, document_id: str, position: int):
         word += "$"
-        self.tree.GetOrSetDefault(word, Index.WeightList(word)).Add(
-            document_id, position
-        )
-
-        for i in range(len(word)):
-            rotated_word = self.Rotate(word, i)
-            self.tree.GetOrSetDefault(rotated_word, word)
+        node = self.tree.Add(word, Index.WeightList(word))
+        if (node.IsEmpty()):
+            for i in range(len(word)):
+                rotated_word = self.Rotate(word, i)
+                self.tree.Add(rotated_word, word)
+        node.Add(document_id, position)
         self.document_lengths[document_id] = -1
-
-    def Get(self, word: str) -> Index.WeightList:
-        output: str | Index.WeightList = self.tree.Get(word)
-        if isinstance(output, str):
-            return self.tree.Get(output)
-        return output
+    def Get(self, word: str) -> list[Index.WeightList]:
+        return self.tree.Get(word)
 
     def RecomputeWeights(self):
         for key in self.document_lengths.keys():
@@ -334,12 +310,8 @@ class Index:
         for key, length in self.document_lengths.items():
             self.document_lengths[key] = math.sqrt(length)
 
-    def RemoveNullWeights(self):
-        self.tree.RemoveNullWeights()
-
     def Rotate(self, word: str, amount: int = 1) -> str:
         return word[amount:] + word[:amount]
-
     def PrepareWordForQuery(self, word: str) -> str:
         count: int = word.count("*")
 
@@ -360,10 +332,11 @@ class Index:
             return "$" + word[:-1] + "*"
 
         return word.split("*")[-1] + "$" + word.split("*")[0] + "*"
-
     def Query(self, words: list[str]) -> list[tuple[str, float]]:
         word_occ: dict[str, int] = {}
         for w in words:
+            if (w == "*" or w == "**"):
+                continue
             new_w: str = self.PrepareWordForQuery(w)
             word_occ[new_w] = word_occ.get(new_w, 0) + 1
 
@@ -382,8 +355,7 @@ class Index:
         scores: dict[str, float] = {}
 
         for word, value in query_vector.items():
-            weight_list: Index.WeightList = self.Get(word)
-            if weight_list != None:
+            for weight_list in self.Get(word):
                 for document_id, weight in weight_list.GetDocumentWeights():
                     v: float = weight * value
                     scores[document_id] = scores.get(document_id, 0) + v
@@ -394,4 +366,18 @@ class Index:
 
         result = [(key, score) for key, score in scores.items()]
         result.sort(key=lambda s: s[1], reverse=True)
+        return result
+    def QueryWords(self, words: list[str]) -> list[str]:
+        word_occ: dict[str, int] = {}
+        for w in words:
+            if (w == "*" or w == "**"):
+                continue
+            new_w: str = self.PrepareWordForQuery(w)
+            word_occ[new_w] = word_occ.get(new_w, 0) + 1
+
+        result = []
+        for word in word_occ.keys():
+            for weight_list in self.Get(word):
+                if (weight_list._word not in result):
+                    result.append(weight_list._word)
         return result
