@@ -37,7 +37,7 @@ class Query:
 
     def getTrigrams(self, word: str) -> list[str]:
         output: list[str] = []
-        for i in range(1, len(word) - 1):
+        for i in range(1, len(word)):
             if word[i - 1 : i + 1] not in output:
                 output.append(word[i - 1 : i + 1])
         return output
