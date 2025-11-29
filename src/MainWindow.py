@@ -75,8 +75,6 @@ class MainWindow(QtWidgets.QMainWindow):
         query = Query(queryText)
         listWordQuery:list[str]= query.getStemerWords(stemer)
         listCorrectedWordQuery:list[str]= query.getCorrectedWords(stemer, soundex)
-        print(listWordQuery)
-        print(listCorrectedWordQuery)
         if(listWordQuery != listCorrectedWordQuery):
             queryTextCorrected:str = "Essayez avec l'orthographe :<b>"
             for i in range (0,len(listWordQuery)):
