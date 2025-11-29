@@ -9,10 +9,11 @@ index_path: str = "ressources/index.bin"
 documents_dir: str = "ressources/documents"
 stemer_path: str = "ressources/stem.txt"
 stopword_path: str = "ressources/stopword.txt"
+words_path: str = "ressources/words.txt"
 
 stemer: Stemer = Stemer(stemer_path)
 stopwords: StopWords = StopWords(stopword_path)
-soundex = Soundex(stemer)
+soundex = Soundex(words_path)
 
 index: Index = Index.LoadFromFile(index_path)
 documents = Document.loadDocuments(documents_dir, stopwords)

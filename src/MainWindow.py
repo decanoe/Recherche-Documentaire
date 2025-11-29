@@ -1,4 +1,5 @@
 import sys
+import time
 from PySide6 import QtCore, QtWidgets
 from ui.InfoDocument import InfoDocument
 
@@ -38,10 +39,12 @@ class MainWindow(QtWidgets.QMainWindow):
         widget = QtWidgets.QWidget()
         widget.setLayout(layout)
 
+        self.queryCorrected = QtWidgets.QLabel()
         self.nbResultDoc = QtWidgets.QLabel("Documents trouvés : 0")
 
         layout2 = QtWidgets.QVBoxLayout()
         layout2.addWidget(widget)
+        layout2.addWidget(self.queryCorrected)
         layout2.addWidget(self.nbResultDoc)
 
         widget2 = QtWidgets.QWidget()
@@ -67,17 +70,33 @@ class MainWindow(QtWidgets.QMainWindow):
             widget = item.widget()
             if widget is not None:
                 widget.deleteLater()
-                
-        query = Query(self.textField.text())
+        
+        queryText:str = self.textField.text()
+        query = Query(queryText)
         listWordQuery:list[str]= query.getStemerWords(stemer)
-        # listWordQuery = query.getCorrectedWords(stemer, soundex)
+        listCorrectedWordQuery:list[str]= query.getCorrectedWords(stemer, soundex)
+        print(listWordQuery)
+        print(listCorrectedWordQuery)
+        if(listWordQuery != listCorrectedWordQuery):
+            queryTextCorrected:str = "Essayez avec l'orthographe :<b>"
+            for i in range (0,len(listWordQuery)):
+                if(listWordQuery[i] != listCorrectedWordQuery[i]):
+                    queryTextCorrected += " <font style=\"color:blue;\">" + listCorrectedWordQuery[i] + "</font>"
+                else:
+                    queryTextCorrected += " " + listWordQuery[i]
+            self.queryCorrected.setText(queryTextCorrected + "</b>")
+        else:
+            self.queryCorrected.setText("")
+        
+        startTime = time.time()
         docsFound = index.Query(listWordQuery)
+        endTime = time.time()
         nbDocDisplay: int = 20
         for d, s in docsFound[:nbDocDisplay]:
             self.resultLayout.addWidget(InfoDocument(self.documents[d],listWordQuery,stemer))
         
         if len(docsFound)> nbDocDisplay:
-            self.nbResultDoc.setText("Documents trouvés : "+str(len(docsFound))+ " ("+str(nbDocDisplay)+" affichés)")
+            self.nbResultDoc.setText("Documents trouvés : "+str(len(docsFound))+ " ("+str(nbDocDisplay)+" affichés)\t Temps : "+str(endTime-startTime)[:7]+"s" )
         else:
             self.nbResultDoc.setText("Documents trouvés : "+str(len(docsFound)))
         
@@ -93,11 +112,12 @@ if __name__ == "__main__":
     documents_dir: str = "ressources/documents"
     stemer_path: str = "ressources/stem.txt"
     stopword_path: str = "ressources/stopword.txt"
+    words_path: str = "ressources/words.txt"
 
     stemer: Stemer = Stemer(stemer_path)
     stopwords: StopWords = StopWords(stopword_path)
     documents = sorted(Document.loadDocuments(documents_dir,stopwords), key = lambda d : d.id)
-    soundex = Soundex(stemer)
+    soundex = Soundex(words_path)
 
     index: Index = Index.LoadFromFile(index_path)
     if index == None:

@@ -6,7 +6,7 @@ class Soundex:
     dictAlphabetCode: dict[str, int]
     dictSoundex: dict[str, list[str]]
 
-    def __init__(self, stemer: Stemer):
+    def __init__(self,words_path:str):
         self.dictAlphabetCode = {
             "a": 0,
             "b": 1,
@@ -36,14 +36,18 @@ class Soundex:
             "z": 2,
         }
         self.dictSoundex = {}
-        self.createSoundex(stemer)
+        self.createSoundex(words_path)
 
-    def createSoundex(self, stemer: Stemer):
-        for word in stemer.dictStem.keys():
-            soundexCode: str = self.soundexerize(word)
-            if self.dictSoundex.get(soundexCode) == None:
-                self.dictSoundex[soundexCode] = []
-            self.dictSoundex[soundexCode].append(word)
+    def createSoundex(self,words_path:str):
+
+        with open(words_path, "r") as f:
+            lines = f.readlines()
+            for line in lines:
+                word = re.sub(r"[^a-z0-9\s*]", " ", line.lower().strip())
+                soundexCode: str = self.soundexerize(word)
+                if self.dictSoundex.get(soundexCode) == None:
+                    self.dictSoundex[soundexCode] = []
+                self.dictSoundex[soundexCode].append(word)
 
     def soundexerize(self, word: str) -> str:
         if re.fullmatch(r"[a-zA-Z]+", word):
