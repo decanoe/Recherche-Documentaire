@@ -46,7 +46,7 @@ pour des parcours sans caractère joker (ce qui est le cas pour ce parcours supp
 % #region ================ Pertinance ===================
 \section{Calcul de la pertinence}\indent
 La pertinence des documents est évaluée en utilisant une distance cosine. Chaque document peut être représenté par un vecteur de dimension $n$ égale au nombre de mots différents
-dans la base de documents (après passage dans le stemer) où chaque coordonnée représente le poids du document pour ce mot.
+dans la base de documents (après passage dans le stemmer) où chaque coordonnée représente le poids du document pour ce mot.
 
 Lors d'une requête, ces vecteurs sont construits en récupérant uniquement les coordonnées dont les mots sont présents dans la requête. Ces nouveaux vecteurs partiels sont ensuite
 normalisés en les divisant par la norme de leur vecteur complet (calculés lors de la création de l'index).
