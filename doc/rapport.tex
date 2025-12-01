@@ -5,15 +5,11 @@
 \usepackage{cases}
 \usepackage{framed}
 
-% #region ================ newcommands ===================
-\newcommand{\shellcmd}[1]{\\\indent\indent\texttt{\footnotesize\# #1}}
-% #endregion
-
 \title{Moteur d'inférence}
 \author{
     Noé De Caestecker
 \and
-    Tino Dolbeau
+    Killian Darras
 }
 \date{\today}
 
@@ -22,191 +18,32 @@
 \tableofcontents
 
 \begin{abstract}
-    L'objectif de ce projet est de programmer un moteur d'inférence d'ordre Zéro+ au minimum adapté à un système expert de notre choix.
-    Ce moteur d'inférence doit pouvoir être utilisé pour d'autres applications similaires à celle pour laquelle il a été créé. 
+    Le but du projet est de créer un système de recherche documentaire permettant des recherches plus ou moins avancées sur un corpus de document fourni.
 \end{abstract}
 
 % #region ================ Système expert ===================
-\section{Système expert}
-Afin de disposer rapidement d'une base pour commencer l'implémentation du moteur d'inférence, nous avons décidé de nous orienter
-vers une application de classement d'espèces animales. L'application prendra une description complète ou non des caractéristiques d'un animal
-(nombre de membres, squelette, poils, \dots) et en déduira l'espèce ou la famille de l'animal (gastéropode, insecte, arachnide, \dots).
+\section{Choix d'implémentation}
+Le projet a été réalisé intégralement en python, en utilisant le moins de librairies externes possibles (librairie graphique et gestion de fichier seulement)
+afin de mettre en œuvre le plus de techniques par nous même.
+
+Le système de recherche permet l'utilisation d'un caractère joker $*$ et fourni les réponses en les ordonnant dans un ordre décroissant de pertinence.
 % #endregion
 
-\pagebreak
+% #region ================ Index ===================
+\section{Index}
+L'index suit une structure d'arbre 2-4 où chaque mot est stocké ainsi que ses rotations (pour l'utilisation du caractère joker).
+Chaque feuille de l'index est une structure qui représente un mot et stocke l'ensemble des poids de ce mot pour chaque document qui le contient au moins 1 fois.
 
-% #region ================ Syntaxe ===================
-\section{Syntaxe}
-La syntaxe choisie se divise en 2 concepts : les faits et les règles.
-
-Les faits seront composés d'une variable (sous forme d'une chaine de caractères ne contenant que des lettres et des underscores),
-d'un symbole arithmétique ou d'affectation et d'une valeur (valeur numérique ou chaine de caractères). Par exemple :
-\begin{itemize}
-    \item \makebox[5cm][l]{nom\_de\_variable} pour une variable booléenne
-    \item \makebox[5cm][l]{-nom\_de\_variable} pour la négation d'une variable booléenne
-    \item \makebox[5cm][l]{nom\_de\_variable = 5.3} pour une variable numérique
-    \item \makebox[5cm][l]{nom\_de\_variable != 1.68} pour une inégalité de variable numérique
-    \item \makebox[5cm][l]{nom\_de\_variable $>$ 0.3} pour une comparaison de variable numérique
-    \item \makebox[5cm][l]{nom\_de\_variable = bleu} pour une variable textuelle
-    \item \makebox[5cm][l]{nom\_de\_variable != rouge} pour une inégalité de variable textuelle
-\end{itemize}
-
-Les règles seront quant à elles composés d'un nom de règle, d'une liste de faits représentant les prémisses et d'une autre représentant les conséquents. Par exemple :
-\begin{itemize}
-    \item R1: A =\> B \\\makebox[1cm][l]{} une règle avec 1 prémisse booléenne et 1 conséquent booléen
-    \item R2: A, B = 3, H =\> B $>$ 2, D $<$ 2 \\\makebox[1cm][l]{} une règle avec 3 prémisses et 2 conséquents
-\end{itemize}
-
-Une base de faits et une base de règles d'exemple sont disponibles dans le dossier $bases$ du répertoire du projet.
+Afin d'éviter les redondances dans les structures de poids, chaque rotation d'un mot ne stocke que le mot dont il provient au lieu de ses poids. Si une recherche tombe
+sur l'une de ces rotations, une seconde recherche dans l'arbre est réalisée pour trouver la bonne liste de poids. Cette implémentation rallonge le temps
+d'exploration, mais permet de réduire grandement la taille de l'index (la taille est divisé par 4 en moyenne). De plus, le temps d'exploration est négligeable
+pour des parcours sans caractère joker (ce qui est le cas pour ce parcours supplémentaire).
 % #endregion
 
-\pagebreak
+% #region ================ Pertinance ===================
+\section{Calcul de la pertinence}
 
-% #region ================ Utilisation du projet ===================
-\section{Utilisation}
-\subsection{Compilation}
-Pour compiler le projet, exécuter les commandes :
-\shellcmd{cd ./build}
-\shellcmd{cmake ..}
-\shellcmd{make}
-L'exécutable sera ensuite accessible depuis le dossier build avec la commande
-\shellcmd{./moteur\_inference <options>}
-
-\subsection{Exécution \& options}
-Une fois le projet compilé, et pour pouvoir l'exécuter, une base de règle et une base de faits initiaux doivent être fournis.
-Les deux premiers arguments de l'exécutable représentent les chemins vers ces deux bases.
-
-Par exemple, l'utilisation des bases fournies avec le projet donne la commande
-\shellcmd{./moteur\_inference ../bases/rules.txt ../bases/facts.txt <options>}\\
-
-L'exécutable attend plusieurs autres options qui seront discutés dans la suite du document. Entre autres, la stratégie à utiliser doit être renseigné
-en utilisant les options -fc ou -bc respectivement pour le chainage avant et arrière (\textit{forward chaining} et \textit{backward chaining})
-\\
-
-Une liste des options est accessible via la commande
-\shellcmd{./moteur\_inference -help}
-
-ou
-\shellcmd{./moteur\_inference -h}
-% #endregion
-
-\pagebreak
-\section{Stratégies}
-% #region ================ chaînage avant ===================
-\subsection{Chaînage avant}
-Le chainage avant (utilisable avec l'option -f ou -fc) sature la base de faits en utilisant la base de règles.
-Un but peut être donné en utilisant l'option -b suivie d'un fait objectif (entre guillemets).
-Si un but est donné, les règles sont appliquées jusqu'a ce que le but soit atteint ou que la base de faits soit saturée.
-
-Lors du chainage avant, l'ensemble des règles utilisés sont indiqués les une après les autres.
-La base de fait finale est ensuite affichée avec une indication si le fait but a été atteint ou non.
-\\
-
-Exemple de sortie pour la commande
-\shellcmd{./moteur\_inference ../bases/rules.txt ../bases/facts.txt -fc}
-\vspace{-2ex}
-\begin{framed}
-\vspace{-2ex}
-\begin{verbatim}
-- R1: tete => animal  
-- R4: animal, squelette_interne, crane => vertebre  
-- R5: vertebre, squelette_os => osteichtyen  
-- R6: osteichtyen, membre = 4 => tetrapode  
-- R7: tetrapode, gesier => oiseau_ou_croco  
-- R9: oiseau_ou_croco, trou_os_tempe => crocodilien  
-6 rules applied
-Fact base saturated
-Final fact base: 
-[
-        tete
-        bouche
-        yeux
-        squelette_interne
-        crane
-        squelette_os
-        membre = 4
-        gesier
-        trou_os_tempe
-        animal
-        vertebre
-        osteichtyen
-        tetrapode
-        oiseau_ou_croco
-        crocodilien
-]
-\end{verbatim}
-\vspace{-2ex}
-\end{framed}
 % #endregion
 \pagebreak
-% #region ================ chaînage arrière ===================
-\subsection{Chaînage arrière}
-Le chainage arrière (utilisable avec l'option -b ou -bc) donne une démonstration d'un fait donné en paramètre.
-Contrairement au chainage arrière, le but doit être donné en utilisant l'option -b suivie du fait objectif (entre guillemets).
-
-La sortie du chainage arrière est un arbre des règles à utiliser pour démontrer le fait voulu. Si un fait demandable nécessaire
-n'est pas présent dans la base de faits et que sa négation n'y est pas non plus, le programme peut alors demander à l'utilisateur si ce fait est
-vrai, faux ou indéterminé.
-\\
-
-Exemple de sortie pour la commande
-\shellcmd{./moteur\_inference ../bases/rules.txt ../bases/facts.txt -bc -g ``crocodilien''}
-\vspace{-4ex}
-\begin{framed}
-\vspace{-2ex}
-\begin{verbatim}
-R9: oiseau_ou_croco, trou_os_tempe => crocodilien  
- +- R7: tetrapode, gesier => oiseau_ou_croco  
- |  +- R6: osteichtyen, membre = 4 => tetrapode  
- |  |  +- R5: vertebre, squelette_os => osteichtyen  
- |  |  |  +- R4: animal, squelette_interne, crane => vertebre  
- |  |  |  |  +- R1: tete => animal  
- |  |  |  |  |  +- tete
- |  |  |  |  +- squelette_interne
- |  |  |  |  \- crane
- |  |  |  \- squelette_os
- |  |  \- membre = 4
- |  \- gesier
- \- trou_os_tempe
-\end{verbatim}
-\vspace{-2ex}
-\end{framed}
-
-Exemple de demande de fait pour "demandable $>$ 2"
-\vspace{-2ex}
-\begin{framed}
-\vspace{-2ex}
-\begin{verbatim}
-Is this true ? (y/n/?) demandable > 2
-_
-\end{verbatim}
-\vspace{-2ex}
-\end{framed}
-% #endregion
-
-\pagebreak
-\section{Critères de choix}
-En plus de choisir la stratégie à utiliser, il est possible de préciser selon quel critère les règles sont choisies.
-Par défaut, les règles sont testées dans l'ordre de leur présence dans la base de règles, ce qui n'est en général pas le meilleur choix.
-Deux critères sont possibles : le nombre de prémisses ou les prémisses les plus récemment ajoutées dans la base de faits.
-% #region ================ Max Premisses ===================
-\subsection{Nombre de prémisses}
-Le critère du nombre de prémisses peut être activé avec l'option -max\_premisses. Si c'est le cas, les règles ayant le plus grand nombre de prémisses
-seront testés en premier. Si plusieurs règles peuvent être appliquées et ont le même nombre de prémisses, la première dans l'ordre de la base de règles
-sera sélectionnée.
-% #endregion
-% #region ================ recent_premisses ===================
-\subsection{Nombre de prémisses}
-Le critère des prémisses les plus récentes peut être activé avec l'option -recent\_premisses. Les règles utilisant les faits les plus récemment ajoutés dans
-la base de faits seront testés en premier. Tout comme le critère du nombre de prémisses, en cas d'égalité, la première règle concernée dans l'ordre de la
-base de règles sera sélectionnée.
-
-Le calcul utilisé pour le choix de la règle est la somme des indices de chaque fait dans la base de faits (les faits les plus récents ayant
-les indices les plus grands).
-% #endregion
-
-\pagebreak
-\section{Contraintes de l'implémentation sur le langage}
-
 
 \end{document}
