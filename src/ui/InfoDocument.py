@@ -15,16 +15,26 @@ class InfoDocument(QtWidgets.QGroupBox):
         copyText = copyText.strip()
         exploredWords = []
         queryRegex = [w.replace("*", ".*") for w in query if "*" in w]
+        
+        replacements = {"ƌ": "<b style=\"color:red;\">", "Ɵ": "</b>"}
         for word in copyText.split():
             if word not in exploredWords:
                 exploredWords.append(word)
+                
+                to_replace = False
                 if stemer.stemerize(word.lower()) in query:
-                    text = re.sub(r"\b"+word+r"\b","<b style=\"color:red;\">"+word+"</b>", text)
+                    to_replace = True
                 else:
                     for regex in queryRegex:
                         if re.fullmatch(regex, word.lower()):
-                            text = re.sub(r"\b"+word+r"\b","<b style=\"color:red;\">"+word+"</b>", text)
-
+                            to_replace = True
+                            break
+                        
+                if (to_replace):
+                    text = re.sub(r"\b"+word+r"\b","ƌ"+word+"Ɵ", text)
+        
+        for key, value in replacements.items():
+            text = text.replace(key, value)
 
         label = QtWidgets.QLabel("<font>"+text.replace(".\n",".<br/>")+"</font>")
         label.setWordWrap(True)
