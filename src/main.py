@@ -16,6 +16,10 @@ class MainWindow(QtWidgets.QMainWindow):
     stemer: Stemer
     soundex: Soundex
     documents: dict[str, Document]
+    docsFound: list[tuple[str,float]]
+    nbDocDisplay: int
+    query: str
+    
     
     def __init__(self, index: Index, stemer: Stemer, soundex: Soundex, documents: list[Document]):
         super().__init__()
@@ -23,6 +27,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.stemer = stemer
         self.soundex = soundex
         self.documents = { d.id : d for d in documents}
+        self.docsFound = []
+        self.currentPage = 0
+        self.nbDocDisplay= 20
+        self.query = Query("")
 
         self.setWindowTitle("Moteur de recherche")
         
@@ -42,10 +50,25 @@ class MainWindow(QtWidgets.QMainWindow):
         self.queryCorrected = QtWidgets.QLabel()
         self.nbResultDoc = QtWidgets.QLabel("Documents trouvés : 0")
 
+        self.beforeButton = QtWidgets.QPushButton("< Précédent")
+        self.beforeButton.clicked.connect(self.buttonBefore)
+        self.nbPage = QtWidgets.QLabel(f"Page {self.currentPage+1} ({self.nbDocDisplay} documents affichés / page)")
+        self.afterButton = QtWidgets.QPushButton("Suivant >")
+        self.afterButton.clicked.connect(self.buttonAfter)
+
+        layout3 = QtWidgets.QHBoxLayout()
+        layout3.addWidget(self.beforeButton)
+        layout3.addWidget(self.nbPage)
+        layout3.addWidget(self.afterButton)
+
+        widget4 = QtWidgets.QWidget()
+        widget4.setLayout(layout3)
+
         layout2 = QtWidgets.QVBoxLayout()
         layout2.addWidget(widget)
         layout2.addWidget(self.queryCorrected)
         layout2.addWidget(self.nbResultDoc)
+        layout2.addWidget(widget4)
 
         widget2 = QtWidgets.QWidget()
         widget2.setLayout(layout2)
@@ -64,17 +87,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(scrollArea)
     
     def search(self):
-        
-        while self.resultLayout.count():
-            item = self.resultLayout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-        
+        self.clearDisplayDocument()
+        self.currentPage = 0
+
         queryText:str = self.textField.text()
-        query = Query(queryText)
-        listWordQuery:list[str]= query.getStemerWords(stemer)
-        listCorrectedWordQuery:list[str]= query.getCorrectedWords(stemer, soundex)
+        self.query = Query(queryText)
+        listWordQuery:list[str]= self.query.getStemerWords(stemer)
+        listCorrectedWordQuery:list[str]= self.query.getCorrectedWords(stemer, soundex)
         if(listWordQuery != listCorrectedWordQuery):
             queryTextCorrected:str = "Essayez avec l'orthographe :<b>"
             for i in range (0,len(listWordQuery)):
@@ -87,18 +106,12 @@ class MainWindow(QtWidgets.QMainWindow):
             self.queryCorrected.setText("")
         
         startTime = time.time()
-        docsFound = index.Query(listWordQuery)
+        self.docsFound = index.Query(listWordQuery)
         endTime = time.time()
-        nbDocDisplay: int = 20
-        for d, s in docsFound[:nbDocDisplay]:
-            self.resultLayout.addWidget(InfoDocument(self.documents[d],listWordQuery,stemer))
+        self.displayDocuments()
+        self.nbResultDoc.setText("Documents trouvés : "+str(len(self.docsFound))+ "\t Temps : "+"{:10.5f}s".format(endTime-startTime))
         
-        if len(docsFound)> nbDocDisplay:
-            self.nbResultDoc.setText("Documents trouvés : "+str(len(docsFound))+ " ("+str(nbDocDisplay)+" affichés)\t Temps : "+"{:10.5f}s".format(endTime-startTime))
-        else:
-            self.nbResultDoc.setText("Documents trouvés : "+str(len(docsFound))+ "\t Temps : "+"{:10.5f}s".format(endTime-startTime))
-        
-        if len(docsFound) == 0:
+        if len(self.docsFound) == 0:
             self.resultLayout.addWidget(QtWidgets.QLabel("<font style=\"color:red;\">Aucun documents trouvés :(</font>"))
 
         
@@ -107,6 +120,32 @@ class MainWindow(QtWidgets.QMainWindow):
             self.search()
         except Exception as error:
             self.resultLayout.addWidget(QtWidgets.QLabel("<font style=\"color:red;\">"+str(error)+"</font>"))
+
+    def displayDocuments(self):
+        self.nbPage.setText(f"Page {self.currentPage+1} ({self.nbDocDisplay} documents affichés / page)")
+        listWordQuery:list[str]= self.query.getStemerWords(stemer)
+        self.clearDisplayDocument()
+        indexS = self.currentPage*self.nbDocDisplay
+        indexE = min(indexS + self.nbDocDisplay, len(self.docsFound))
+        for d, s in self.docsFound[indexS:indexE]:
+            self.resultLayout.addWidget(InfoDocument(self.documents[d],listWordQuery,stemer))
+    
+    def clearDisplayDocument(self):
+        while self.resultLayout.count():
+            item = self.resultLayout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+    
+    def buttonAfter(self):
+        if (self.currentPage + 1) * self.nbDocDisplay < len(self.docsFound):
+            self.currentPage += 1
+            self.displayDocuments()
+
+    def buttonBefore(self):
+        if self.currentPage > 0:
+            self.currentPage -= 1
+            self.displayDocuments()
 
 
 

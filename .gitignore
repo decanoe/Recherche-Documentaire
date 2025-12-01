@@ -4,3 +4,6 @@ __pycache__
 doc/*.aux
 doc/*.log
 doc/*.toc
+doc/*.gz
+doc/*.fdb_latexmk
+doc/*.fls
