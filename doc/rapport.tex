@@ -1,11 +1,13 @@
 \documentclass{article}
+\usepackage[cyr]{aeguill}
+\usepackage[francais]{babel}
 \usepackage{mathtools, stmaryrd}
 \usepackage{xparse}
 \usepackage{amsmath}
 \usepackage{cases}
 \usepackage{framed}
 
-\title{Moteur d'inférence}
+\title{Recherche documentaire}
 \author{
     Noé De Caestecker
 \and
@@ -20,56 +22,57 @@
 \begin{abstract}
     Le but du projet est de créer un système de recherche documentaire permettant des recherches plus ou moins avancées sur un corpus de document fourni.
 \end{abstract}
+\pagebreak
 
 % #region ================ Choix d'implémentation ===================
-\section{Choix d'implémentation}
-Le projet a été réalisé intégralement en python, en utilisant le moins de librairies externes possibles (librairie graphique et gestion de fichier seulement)
-afin de mettre en œuvre le plus de techniques par nous même.
+\section{Choix d'implémentation}\indent
+Le projet a été réalisé intégralement en python, en utilisant le moins de librairies externes possibles (librairie graphique, gestion de fichiers et regex seulement)
+afin de mettre en œuvre le plus de techniques par nous-même.
 
 Le système de recherche permet l'utilisation d'un caractère joker $*$ et fourni les réponses en les ordonnant dans un ordre décroissant de pertinence.
 % #endregion
 
 % #region ================ Index ===================
-\section{Index}
+\section{Index}\indent
 L'index suit une structure d'arbre 2-4 où chaque mot est stocké ainsi que ses rotations (pour l'utilisation du caractère joker).
 Chaque feuille de l'index est une structure qui représente un mot et stocke l'ensemble des poids de ce mot pour chaque document qui le contient au moins 1 fois.
 
 Afin d'éviter les redondances dans les structures de poids, chaque rotation d'un mot ne stocke que le mot dont il provient au lieu de ses poids. Si une recherche tombe
 sur l'une de ces rotations, une seconde recherche dans l'arbre est réalisée pour trouver la bonne liste de poids. Cette implémentation rallonge le temps
-d'exploration, mais permet de réduire grandement la taille de l'index (la taille est divisé par 4 en moyenne). De plus, le temps d'exploration est négligeable
+d'exploration, mais permet de réduire grandement la taille de l'index (la taille est divisée par 4 en moyenne). De plus, le temps d'exploration est négligeable
 pour des parcours sans caractère joker (ce qui est le cas pour ce parcours supplémentaire).
 % #endregion
 
 % #region ================ Pertinance ===================
-\section{Calcul de la pertinence}
-La pertinence des documents est évalué en utilisant une distance cosine. Chaque document peut être représenté par un vecteur de dimension $n$ égale au nombre de mots différents
-dans la base de documents (après passage dans le stemer) où chaque coordonnée représente le pois du document pour ce mot.
+\section{Calcul de la pertinence}\indent
+La pertinence des documents est évaluée en utilisant une distance cosine. Chaque document peut être représenté par un vecteur de dimension $n$ égale au nombre de mots différents
+dans la base de documents (après passage dans le stemer) où chaque coordonnée représente le poids du document pour ce mot.
 
 Lors d'une requête, ces vecteurs sont construits en récupérant uniquement les coordonnées dont les mots sont présents dans la requête. Ces nouveaux vecteurs partiels sont ensuite
 normalisés en les divisant par la norme de leur vecteur complet (calculés lors de la création de l'index).
-Seul les vecteurs des documents ayant un mot en commun avec la requête sont récupérés (pour simplifier les calculs).
+Seuls les vecteurs des documents ayant un mot en commun avec la requête sont récupérés (pour simplifier les calculs).
 La requête est, elle aussi, transformée en vecteur en utilisant les mêmes poids que les documents et ce vecteur est aussi normalisé.
 
 On donne ensuite à chaque document un poids égal au produit scalaire entre son vecteur et le vecteur de la requête.
 % #endregion
 
+\pagebreak
 % #region ================ Calcul des poids ===================
-\section{Calcul et représentation des poids}
-Les poids associés à chaque document pour chaque mot sont stocké dans l'arbre de l'index. Chaque feuille de l'index représente un mot $m$ (ou une rotation de $m$) et stocke soit
+\section{Calcul et représentation des poids}\indent
+Les poids associés à chaque document pour chaque mot sont stockés dans l'arbre de l'index. Chaque feuille de l'index représente un mot $m$ (ou une rotation de $m$) et stocke soit
 un pointeur vers la feuille de $m$ si la feuille est une rotation, soit un dictionnaire (hash map) qui associe chaque document $d$ le nombre d'occurrences de $m$ dans $d$.
 La structure en dictionnaire permet de faciliter la création de l'index (dans lequel chaque mot est ajouté 1 par 1) sans augmenter la complexité de la recherche puisque la création
-des vecteurs de document se fait en parcourant les paires mot-document.\\
+des vecteurs de document se fait en parcourant les paires mots-documents.\\
 
 Une fois tous les mots ajoutés dans l'index et le nombre de documents connu, un passage est fait dans chaque feuille de l'arbre pour calculer l'$idf$ du mot et stocker
 (avec le nombre d'occurrences) le poids de ce mot pour chaque document.
 
-Ces poids sont calculés en multipliant $1 + \log(w_f)$ par l'$idf$ où $w_f$ est le nombre d'occurrence du mot dans le document.
-L'$idf$ est calculé comme $\log(d_c / d_f)$ où $d_f$ est le nombre de documents contenant le mot et $d_c$ est le nombre de documents.
+Ces poids sont calculés en multipliant $1 + \log_{10}(w_f)$ par l'$idf$ où $w_f$ est le nombre d'occurrences du mot dans le document.
+L'$idf$ est calculé comme $\log_{10}(\frac{d_c}{d_f})$ où $d_f$ est le nombre de documents contenant le mot et $d_c$ est le nombre de documents.
 % #endregion
-\pagebreak
 
 % #region ================ Correction des mots ===================
-\section{Correction des mots}
+\section{Correction des mots}\indent
 Afin d'aider l'utilisateur dans sa recherche, une correction des mots est proposée (mais pas imposée).\\
 
 Cette correction est guidée par un fichier texte contenant les mots de la langue anglaise (langage des documents). Ce fichier est chargé dans un dictionnaire
@@ -80,12 +83,12 @@ La liste de mots similaire est ensuite parcourue pour trouver le mot le plus pro
 % #endregion
 
 % #region ================ Stoplist ===================
-\section{Stop list}
+\section{Stop list}\indent
 La stop list fournie étant trop limitée (trop de mots utiles), nous avons décidé de créer notre propre stop list en utilisant les documents fournis.
-Nous avons décidé de retirer tous les mots dont l'$idf$ était inférieur à $0.1$ puisque ces mots ont peu d'importance dans les poids des documents finaux
-mais sont liés à des dictionnaires de poids très grands (leur nombre de documents lié étant supperieur à $80\%$ du nombre de documents total).
+Nous avons décidé de retirer tous les mots dont l'$idf$ était inférieur à $0.1$ puisque ces mots ont peu d'importance dans les poids des documents finaux,
+mais sont liés à des dictionnaires de poids très grands (leur nombre de documents lié étant supérieur à $80\%$ du nombre de documents total).
 
-Cette stop list n'aide pas la vitesse de requête mais permet de réduire un peu la taille de l'index.
+Cette stop list n'aide pas la vitesse de requête, mais permet de réduire un peu la taille de l'index.
 % #endregion
 \pagebreak
 
