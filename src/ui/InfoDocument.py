@@ -14,11 +14,17 @@ class InfoDocument(QtWidgets.QGroupBox):
         copyText = re.sub(r"[^a-zA-Z0-9\s]", " ", text)
         copyText = copyText.strip()
         exploredWords = []
+        queryRegex = [w.replace("*", ".*") for w in query if "*" in w]
         for word in copyText.split():
             if word not in exploredWords:
                 exploredWords.append(word)
                 if stemer.stemerize(word.lower()) in query:
                     text = re.sub(r"\b"+word+r"\b","<b style=\"color:red;\">"+word+"</b>", text)
+                else:
+                    for regex in queryRegex:
+                        if re.fullmatch(regex, word.lower()):
+                            text = re.sub(r"\b"+word+r"\b","<b style=\"color:red;\">"+word+"</b>", text)
+
 
         label = QtWidgets.QLabel("<font>"+text.replace(".\n",".<br/>")+"</font>")
         label.setWordWrap(True)

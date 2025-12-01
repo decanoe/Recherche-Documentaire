@@ -30,7 +30,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.textField.setFocusPolicy(QtCore.Qt.ClickFocus) 
 
         self.queryButton = QtWidgets.QPushButton("Search")
-        self.queryButton.clicked.connect(self.search)
+        self.queryButton.clicked.connect(self.button_event)
 
         layout = QtWidgets.QHBoxLayout()
         layout.addWidget(self.textField)
@@ -94,12 +94,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.resultLayout.addWidget(InfoDocument(self.documents[d],listWordQuery,stemer))
         
         if len(docsFound)> nbDocDisplay:
-            self.nbResultDoc.setText("Documents trouvés : "+str(len(docsFound))+ " ("+str(nbDocDisplay)+" affichés)\t Temps : "+str(endTime-startTime)[:7]+"s" )
+            self.nbResultDoc.setText("Documents trouvés : "+str(len(docsFound))+ " ("+str(nbDocDisplay)+" affichés)\t Temps : "+"{:10.5f}s".format(endTime-startTime))
         else:
-            self.nbResultDoc.setText("Documents trouvés : "+str(len(docsFound)))
+            self.nbResultDoc.setText("Documents trouvés : "+str(len(docsFound))+ "\t Temps : "+"{:10.5f}s".format(endTime-startTime))
         
         if len(docsFound) == 0:
-            self.resultLayout.addWidget(QtWidgets.QLabel("Aucun documents trouvés :("))
+            self.resultLayout.addWidget(QtWidgets.QLabel("<font style=\"color:red;\">Aucun documents trouvés :(</font>"))
+
+        
+    def button_event(self):
+        try:
+            self.search()
+        except Exception as error:
+            self.resultLayout.addWidget(QtWidgets.QLabel("<font style=\"color:red;\">"+str(error)+"</font>"))
 
 
 
