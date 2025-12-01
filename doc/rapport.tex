@@ -21,7 +21,7 @@
     Le but du projet est de créer un système de recherche documentaire permettant des recherches plus ou moins avancées sur un corpus de document fourni.
 \end{abstract}
 
-% #region ================ Système expert ===================
+% #region ================ Choix d'implémentation ===================
 \section{Choix d'implémentation}
 Le projet a été réalisé intégralement en python, en utilisant le moins de librairies externes possibles (librairie graphique et gestion de fichier seulement)
 afin de mettre en œuvre le plus de techniques par nous même.
@@ -42,7 +42,50 @@ pour des parcours sans caractère joker (ce qui est le cas pour ce parcours supp
 
 % #region ================ Pertinance ===================
 \section{Calcul de la pertinence}
+La pertinence des documents est évalué en utilisant une distance cosine. Chaque document peut être représenté par un vecteur de dimension $n$ égale au nombre de mots différents
+dans la base de documents (après passage dans le stemer) où chaque coordonnée représente le pois du document pour ce mot.
 
+Lors d'une requête, ces vecteurs sont construits en récupérant uniquement les coordonnées dont les mots sont présents dans la requête. Ces nouveaux vecteurs partiels sont ensuite
+normalisés en les divisant par la norme de leur vecteur complet (calculés lors de la création de l'index).
+Seul les vecteurs des documents ayant un mot en commun avec la requête sont récupérés (pour simplifier les calculs).
+La requête est, elle aussi, transformée en vecteur en utilisant les mêmes poids que les documents et ce vecteur est aussi normalisé.
+
+On donne ensuite à chaque document un poids égal au produit scalaire entre son vecteur et le vecteur de la requête.
+% #endregion
+
+% #region ================ Calcul des poids ===================
+\section{Calcul et représentation des poids}
+Les poids associés à chaque document pour chaque mot sont stocké dans l'arbre de l'index. Chaque feuille de l'index représente un mot $m$ (ou une rotation de $m$) et stocke soit
+un pointeur vers la feuille de $m$ si la feuille est une rotation, soit un dictionnaire (hash map) qui associe chaque document $d$ le nombre d'occurrences de $m$ dans $d$.
+La structure en dictionnaire permet de faciliter la création de l'index (dans lequel chaque mot est ajouté 1 par 1) sans augmenter la complexité de la recherche puisque la création
+des vecteurs de document se fait en parcourant les paires mot-document.\\
+
+Une fois tous les mots ajoutés dans l'index et le nombre de documents connu, un passage est fait dans chaque feuille de l'arbre pour calculer l'$idf$ du mot et stocker
+(avec le nombre d'occurrences) le poids de ce mot pour chaque document.
+
+Ces poids sont calculés en multipliant $1 + \log(w_f)$ par l'$idf$ où $w_f$ est le nombre d'occurrence du mot dans le document.
+L'$idf$ est calculé comme $\log(d_c / d_f)$ où $d_f$ est le nombre de documents contenant le mot et $d_c$ est le nombre de documents.
+% #endregion
+\pagebreak
+
+% #region ================ Correction des mots ===================
+\section{Correction des mots}
+Afin d'aider l'utilisateur dans sa recherche, une correction des mots est proposée (mais pas imposée).\\
+
+Cette correction est guidée par un fichier texte contenant les mots de la langue anglaise (langage des documents). Ce fichier est chargé dans un dictionnaire
+(hash map) où chaque clef est un code Soundex et chaque valeur est une liste de mots correspondants au code. Ce dictionnaire est utilisé pour guider la
+correction des mots vers des mots se prononçant de façon similaire.\\
+
+La liste de mots similaire est ensuite parcourue pour trouver le mot le plus proche en utilisant un système de trigramme et la mesure de Jaccard.
+% #endregion
+
+% #region ================ Stoplist ===================
+\section{Stop list}
+La stop list fournie étant trop limitée (trop de mots utiles), nous avons décidé de créer notre propre stop list en utilisant les documents fournis.
+Nous avons décidé de retirer tous les mots dont l'$idf$ était inférieur à $0.1$ puisque ces mots ont peu d'importance dans les poids des documents finaux
+mais sont liés à des dictionnaires de poids très grands (leur nombre de documents lié étant supperieur à $80\%$ du nombre de documents total).
+
+Cette stop list n'aide pas la vitesse de requête mais permet de réduire un peu la taille de l'index.
 % #endregion
 \pagebreak
 

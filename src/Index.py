@@ -318,14 +318,12 @@ class Index:
         if count == 0:
             return word + "$"
         if count > 2:
-            raise Exception("Cannot use more than two wildcards in the same word")
+            raise Exception("Impossible d'utiliser plus de 2 caractères joker dans le même mot !")
 
         if count == 2 and word[0] == "*" and word[-1] == "*":
             return word[1:]
         if count == 2:
-            raise Exception(
-                "Cannot use two wildcards in the same word unless it is at the start and end"
-            )
+            raise Exception("Impossible d'utiliser 2 caractères joker dans le même mot s'ils ne sont pas au début et à la fin !")
         if word[0] == "*":
             return word[1:] + "$*"
         if word[-1] == "*":
